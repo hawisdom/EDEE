@@ -47,13 +47,13 @@ def load_datasets_and_vocabs(args):
         ltp.init_dict(path=user_dict_file)
 
         logger.info('Creating train examples')
-        train_examples,train_labels_weight = create_example(train_file,ltp)
+        train_examples,train_labels_weight = create_example(train_file,ltp,'train')
         logger.info('store train examples to cache file')
         with open(train_example_file, 'wb') as f:
             pickle.dump(train_examples, f, -1)
 
         logger.info('Creating test examples')
-        test_examples, test_labels_weight = create_example(test_file, ltp)
+        test_examples, test_labels_weight = create_example(test_file, ltp,'test')
         logger.info('store test examples to cache file')
         with open(test_example_file, 'wb') as f:
             pickle.dump(test_examples, f, -1)
@@ -90,9 +90,13 @@ def generate_user_dict(files,path):
                 f.write(entity.strip()+'\n')
     f.close()
 
-def create_example(file,ltp):
+def create_example(file,ltp,dataset_type):
     with open(file, 'r', encoding='utf-8-sig') as fp:
         datas = json.load(fp)
+
+    # {文档: {词语: 次数}}
+    f = open('./data/repeat.json','r',encoding='utf-8-sig')
+    repeat_info = json.load(f)
     examples = []
     label_ids = []
     for doc in datas:
@@ -114,7 +118,10 @@ def create_example(file,ltp):
                 for arg,dranges in arg_dranges.items():
                     for sent,ch_s,ch_e in dranges:
                         if sent == sent_idx and word_loc >= ch_s and word_loc <= ch_e:
-                            word_info = get_word_info(sent_idx,events,word,mspan2guess_field[arg])
+                            if dataset_type == 'train':
+                                word_info = get_word_info(sent_idx,events,word,mspan2guess_field[arg])
+                            else:
+                                word_info = get_word_info_test(sent_idx,events,word,mspan2guess_field[arg],repeat_info,doc[0])
                             type_flag = True
                             break
                     if type_flag:
@@ -165,8 +172,10 @@ def create_example(file,ltp):
             for ele in line:
                 label_ids.append(ele)
 
+    f.close()
     label_weight = get_labels_weight(label_ids)
     return examples,label_weight
+
 
 def get_word_info(sent_idx,events,word,word_type):
     word_info = {word:[]}
@@ -183,6 +192,34 @@ def get_word_info(sent_idx,events,word,word_type):
                 if (event_type,word,role) not in word_key_info:
                     word_key_info.append((event_type,word,role))
                     word_info[word].append((event_type,event_id, sent_idx, word, role, loc_in_arg,word_type))
+    return word_info
+
+#{文档: {词语: 次数}}
+def get_word_info_test(sent_idx,events,word,word_type,repeat_info,doc_id):
+    word_info = {word: []}
+    if doc_id not in repeat_info.keys():
+        return word_info
+    repeat_word_info = repeat_info[doc_id]
+    for i in range(int(repeat_word_info[word])):
+        word_info[word].append([None,None,sent_idx,word,None,None,None])
+
+    # for evaluation
+    word_key_info = []
+    for i,event in enumerate(events):
+        if i > len(word_info[word]):
+            continue
+        event_id = event[0]
+        event_type = event[1]
+        role_args = event[2]
+        for role,arg in role_args.items():
+            if arg is None:
+                continue
+            if word in arg:
+                loc_in_arg = arg.find(word)
+                if (event_type,word,role) not in word_key_info:
+                    word_key_info.append((event_type,word,role))
+                    word_info[word][i] = [event_type,event_id, sent_idx, word, role, loc_in_arg,word_type]
+
     return word_info
 
 
@@ -362,5 +399,3 @@ def my_collate(batch):
     labels = torch.tensor(labels[0])
 
     return word_ids,wType_ids,labels
-
-
