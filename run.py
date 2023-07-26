@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from datasets import load_datasets_and_vocabs
 from models import EDEE
-from trainer import train
+from trainer import train,evaluate
 
 logger = logging.getLogger()
 
@@ -34,6 +34,7 @@ def parse_args():
     parser.add_argument('--embedding_dir', type=str, default='./model', help='Directory storing embeddings')
     parser.add_argument('--word_embedding_dim', type=int, default=768, help='Dimension of embeddings')
     parser.add_argument('--word_type_embedding_dim', type=int, default=50, help='Dimension of word_type embeddings')
+
 
     # MLP
     parser.add_argument('--hidden_size', type=int, default=200,
@@ -92,37 +93,14 @@ def main():
     set_seed(args)
 
     # Load datasets and vocabs
-    train_dataset,train_labels_weight,test_dataset,test_labels_weight,word_vocab,wType_tag_vocab = load_datasets_and_vocabs(args)
+    train_dataset,train_labels_weight,dev_dataset,dev_labels_weight,test_dataset,test_labels_weight,word_vocab,wType_tag_vocab = load_datasets_and_vocabs(args)
 
     # Build Model
     model = EDEE(args,wType_tag_vocab['len'])
     model.to(args.device)
 
     # Train
-    _, ef_results, er_results, eu_results, eo_results, ep_results = train(args,model,train_dataset,test_dataset,train_labels_weight,test_labels_weight)
-
-    if len(ef_results):
-        best_eval_result = max(ef_results, key=lambda x: x['f1'])
-        for key in sorted(best_eval_result.keys()):
-            logger.info("ef_best:  %s = %s", key, str(best_eval_result[key]))
-    if len(er_results):
-        best_eval_result = max(er_results, key=lambda x: x['f1'])
-        for key in sorted(best_eval_result.keys()):
-            logger.info("er_best  %s = %s", key, str(best_eval_result[key]))
-    if len(eu_results):
-        best_eval_result = max(eu_results, key=lambda x: x['f1'])
-        for key in sorted(best_eval_result.keys()):
-            logger.info("eu_best  %s = %s", key, str(best_eval_result[key]))
-    if len(eo_results):
-        best_eval_result = max(eo_results, key=lambda x: x['f1'])
-        for key in sorted(best_eval_result.keys()):
-            logger.info("eo_best  %s = %s", key, str(best_eval_result[key]))
-    if len(ep_results):
-        best_eval_result = max(ep_results, key=lambda x: x['f1'])
-        for key in sorted(best_eval_result.keys()):
-            logger.info("ep_best  %s = %s", key, str(best_eval_result[key]))
-
+    train(args,model,train_dataset,dev_dataset,test_dataset,train_labels_weight,dev_labels_weight,test_labels_weight)
 
 if __name__ == "__main__":
     main()
-
