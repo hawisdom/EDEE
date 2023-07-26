@@ -60,11 +60,6 @@ def train(args,model,train_dataset,test_dataset,train_labels_weight,test_labels_
                 args.gradient_accumulation_steps)
     logger.info("  Total optimization steps = %d", t_total)
 
-    all_ef_results = []
-    all_er_results = []
-    all_eu_results = []
-    all_eo_results = []
-    all_ep_results = []
     global_step = 0
     tr_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
@@ -104,16 +99,10 @@ def train(args,model,train_dataset,test_dataset,train_labels_weight,test_labels_
                     logging_loss = tr_loss
 
         results,eval_loss = evaluate(args,test_dataset,model,test_labels_weight,f)
-        all_ef_results.append(results["EquityFreeze"])
-        all_er_results.append(results["EquityRepurchase"])
-        all_eu_results.append(results["EquityUnderweight"])
-        all_eo_results.append(results["EquityOverweight"])
-        all_ep_results.append(results["EquityPledge"])
         tb_writer.add_scalar('train_epoch_loss',(tr_loss - logging_loss) / args.logging_steps, epoch)
         epoch += 1
 
     tb_writer.close()
-    return global_step, all_ef_results, all_er_results, all_eu_results, all_eo_results, all_ep_results
 
 def evaluate(args, eval_dataset, model,test_labels_weight,f):
     args.eval_batch_size = args.per_gpu_eval_batch_size
